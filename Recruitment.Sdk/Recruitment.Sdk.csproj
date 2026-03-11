@@ -7,7 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Recruitment.Dto\Recruitment.Dto.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Recruitment.Interfaces\Recruitment.Interfaces.csproj" />
   </ItemGroup>
 
 </Project>
