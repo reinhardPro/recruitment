@@ -1,0 +1,220 @@
+@page "/jobs"
+@inject Recruitment.Interfaces.IJobService JobService
+
+<PageTitle>Jobs</PageTitle>
+
+<h1>Jobs</h1>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="ShowCreateForm">Add Job</button>
+    </div>
+
+    @if (_showForm)
+    {
+        <div class="card mb-4">
+            <div class="card-header">@(_editId.HasValue ? "Edit Job" : "New Job")</div>
+            <div class="card-body">
+                <EditForm Model="_formModel" OnValidSubmit="SaveJob">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="mb-2">
+                        <label class="form-label">Title</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Title" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" @bind-Value="_formModel.Description" rows="3" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Location</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Location" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Experience Level</label>
+                        <InputText class="form-control" @bind-Value="_formModel.ExperienceLevel" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Education Level</label>
+                        <InputText class="form-control" @bind-Value="_formModel.EducationLevel" />
+                    </div>
+                    @if (!_editId.HasValue)
+                    {
+                        <div class="mb-2">
+                            <label class="form-label">Recruiter Id</label>
+                            <InputNumber class="form-control" @bind-Value="_formModel.RecruiterId" />
+                        </div>
+                    }
+                    <button type="submit" class="btn btn-success me-2">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Title</th>
+                <th>Location</th>
+                <th>Experience</th>
+                <th>Education</th>
+                <th>Recruiter Id</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var job in _jobs)
+            {
+                <tr>
+                    <td>@job.Id</td>
+                    <td>@job.Title</td>
+                    <td>@job.Location</td>
+                    <td>@job.ExperienceLevel</td>
+                    <td>@job.EducationLevel</td>
+                    <td>@job.RecruiterId</td>
+                    <td>@job.CreatedAt.ToShortDateString()</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditJob(job)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteJob(job.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<Recruitment.Dto.Responses.JobResponse> _jobs = [];
+    private bool _isLoading = true;
+    private bool _showForm = false;
+    private int? _editId = null;
+    private string _errorMessage = string.Empty;
+
+    private JobFormModel _formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJobs();
+    }
+
+    private async Task LoadJobs()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        try
+        {
+            _jobs = await JobService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load jobs: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        _formModel = new JobFormModel();
+        _editId = null;
+        _showForm = true;
+    }
+
+    private void EditJob(Recruitment.Dto.Responses.JobResponse job)
+    {
+        _formModel = new JobFormModel
+        {
+            Title = job.Title,
+            Description = job.Description,
+            Location = job.Location,
+            ExperienceLevel = job.ExperienceLevel,
+            EducationLevel = job.EducationLevel,
+            RecruiterId = job.RecruiterId
+        };
+        _editId = job.Id;
+        _showForm = true;
+    }
+
+    private async Task SaveJob()
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            if (_editId.HasValue)
+            {
+                await JobService.UpdateAsync(_editId.Value, new Recruitment.Dto.Requests.UpdateJobRequest
+                {
+                    Title = _formModel.Title,
+                    Description = _formModel.Description,
+                    Location = _formModel.Location,
+                    ExperienceLevel = _formModel.ExperienceLevel,
+                    EducationLevel = _formModel.EducationLevel
+                });
+            }
+            else
+            {
+                await JobService.CreateAsync(new Recruitment.Dto.Requests.CreateJobRequest
+                {
+                    Title = _formModel.Title,
+                    Description = _formModel.Description,
+                    Location = _formModel.Location,
+                    ExperienceLevel = _formModel.ExperienceLevel,
+                    EducationLevel = _formModel.EducationLevel,
+                    RecruiterId = _formModel.RecruiterId
+                });
+            }
+            _showForm = false;
+            await LoadJobs();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save job: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteJob(int id)
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            await JobService.DeleteAsync(id);
+            await LoadJobs();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to delete job: {ex.Message}";
+        }
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+    }
+
+    private class JobFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Title { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+        public string? Location { get; set; }
+        public string? ExperienceLevel { get; set; }
+        public string? EducationLevel { get; set; }
+        public int RecruiterId { get; set; }
+    }
+}

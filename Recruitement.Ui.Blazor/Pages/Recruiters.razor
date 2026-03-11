@@ -1,0 +1,203 @@
+@page "/recruiters"
+@inject Recruitment.Interfaces.IRecruiterService RecruiterService
+
+<PageTitle>Recruiters</PageTitle>
+
+<h1>Recruiters</h1>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="ShowCreateForm">Add Recruiter</button>
+    </div>
+
+    @if (_showForm)
+    {
+        <div class="card mb-4">
+            <div class="card-header">@(_editId.HasValue ? "Edit Recruiter" : "New Recruiter")</div>
+            <div class="card-body">
+                <EditForm Model="_formModel" OnValidSubmit="SaveRecruiter">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="mb-2">
+                        <label class="form-label">First Name</label>
+                        <InputText class="form-control" @bind-Value="_formModel.FirstName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Last Name</label>
+                        <InputText class="form-control" @bind-Value="_formModel.LastName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Email" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Company</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Company" />
+                    </div>
+                    <button type="submit" class="btn btn-success me-2">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Company</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var recruiter in _recruiters)
+            {
+                <tr>
+                    <td>@recruiter.Id</td>
+                    <td>@recruiter.FirstName @recruiter.LastName</td>
+                    <td>@recruiter.Email</td>
+                    <td>@recruiter.Company</td>
+                    <td>@recruiter.CreatedAt.ToShortDateString()</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditRecruiter(recruiter)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteRecruiter(recruiter.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<Recruitment.Dto.Responses.RecruiterResponse> _recruiters = [];
+    private bool _isLoading = true;
+    private bool _showForm = false;
+    private int? _editId = null;
+    private string _errorMessage = string.Empty;
+
+    private RecruiterFormModel _formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecruiters();
+    }
+
+    private async Task LoadRecruiters()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        try
+        {
+            _recruiters = await RecruiterService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load recruiters: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        _formModel = new RecruiterFormModel();
+        _editId = null;
+        _showForm = true;
+    }
+
+    private void EditRecruiter(Recruitment.Dto.Responses.RecruiterResponse recruiter)
+    {
+        _formModel = new RecruiterFormModel
+        {
+            FirstName = recruiter.FirstName,
+            LastName = recruiter.LastName,
+            Email = recruiter.Email,
+            Company = recruiter.Company
+        };
+        _editId = recruiter.Id;
+        _showForm = true;
+    }
+
+    private async Task SaveRecruiter()
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            if (_editId.HasValue)
+            {
+                await RecruiterService.UpdateAsync(_editId.Value, new Recruitment.Dto.Requests.UpdateRecruiterRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    Company = _formModel.Company
+                });
+            }
+            else
+            {
+                await RecruiterService.CreateAsync(new Recruitment.Dto.Requests.CreateRecruiterRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    Company = _formModel.Company
+                });
+            }
+            _showForm = false;
+            await LoadRecruiters();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save recruiter: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteRecruiter(int id)
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            await RecruiterService.DeleteAsync(id);
+            await LoadRecruiters();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to delete recruiter: {ex.Message}";
+        }
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+    }
+
+    private class RecruiterFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string LastName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? Company { get; set; }
+    }
+}

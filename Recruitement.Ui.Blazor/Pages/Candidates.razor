@@ -1,0 +1,213 @@
+@page "/candidates"
+@inject Recruitment.Interfaces.ICandidateService CandidateService
+
+<PageTitle>Candidates</PageTitle>
+
+<h1>Candidates</h1>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <button class="btn btn-primary" @onclick="ShowCreateForm">Add Candidate</button>
+    </div>
+
+    @if (_showForm)
+    {
+        <div class="card mb-4">
+            <div class="card-header">@(_editId.HasValue ? "Edit Candidate" : "New Candidate")</div>
+            <div class="card-body">
+                <EditForm Model="_formModel" OnValidSubmit="SaveCandidate">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="mb-2">
+                        <label class="form-label">First Name</label>
+                        <InputText class="form-control" @bind-Value="_formModel.FirstName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Last Name</label>
+                        <InputText class="form-control" @bind-Value="_formModel.LastName" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Email</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Email" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Phone</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Phone" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Location</label>
+                        <InputText class="form-control" @bind-Value="_formModel.Location" />
+                    </div>
+                    <button type="submit" class="btn btn-success me-2">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="CancelForm">Cancel</button>
+                </EditForm>
+            </div>
+        </div>
+    }
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Location</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var candidate in _candidates)
+            {
+                <tr>
+                    <td>@candidate.Id</td>
+                    <td>@candidate.FirstName @candidate.LastName</td>
+                    <td>@candidate.Email</td>
+                    <td>@candidate.Phone</td>
+                    <td>@candidate.Location</td>
+                    <td>@candidate.CreatedAt.ToShortDateString()</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditCandidate(candidate)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCandidate(candidate.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<Recruitment.Dto.Responses.CandidateResponse> _candidates = [];
+    private bool _isLoading = true;
+    private bool _showForm = false;
+    private int? _editId = null;
+    private string _errorMessage = string.Empty;
+
+    private CandidateFormModel _formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCandidates();
+    }
+
+    private async Task LoadCandidates()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+        try
+        {
+            _candidates = await CandidateService.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load candidates: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        _formModel = new CandidateFormModel();
+        _editId = null;
+        _showForm = true;
+    }
+
+    private void EditCandidate(Recruitment.Dto.Responses.CandidateResponse candidate)
+    {
+        _formModel = new CandidateFormModel
+        {
+            FirstName = candidate.FirstName,
+            LastName = candidate.LastName,
+            Email = candidate.Email,
+            Phone = candidate.Phone,
+            Location = candidate.Location
+        };
+        _editId = candidate.Id;
+        _showForm = true;
+    }
+
+    private async Task SaveCandidate()
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            if (_editId.HasValue)
+            {
+                await CandidateService.UpdateAsync(_editId.Value, new Recruitment.Dto.Requests.UpdateCandidateRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    Phone = _formModel.Phone,
+                    Location = _formModel.Location
+                });
+            }
+            else
+            {
+                await CandidateService.CreateAsync(new Recruitment.Dto.Requests.CreateCandidateRequest
+                {
+                    FirstName = _formModel.FirstName,
+                    LastName = _formModel.LastName,
+                    Email = _formModel.Email,
+                    Phone = _formModel.Phone,
+                    Location = _formModel.Location
+                });
+            }
+            _showForm = false;
+            await LoadCandidates();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save candidate: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteCandidate(int id)
+    {
+        _errorMessage = string.Empty;
+        try
+        {
+            await CandidateService.DeleteAsync(id);
+            await LoadCandidates();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to delete candidate: {ex.Message}";
+        }
+    }
+
+    private void CancelForm()
+    {
+        _showForm = false;
+    }
+
+    private class CandidateFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string LastName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+        public string? Location { get; set; }
+    }
+}
